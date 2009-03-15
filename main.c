@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <fcntl.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
@@ -77,11 +76,6 @@ void* http_worker(void* q) {
 	int got = 0;
 	while (got >= 0) {
 		got = tq->pop();
-		fcntl(got, F_SETFL, O_ASYNC, 1);
-		#ifdef DEBUG_LOW
-		printf("thread got fd %d\n", got);
-
-		pushbuffer(got, "Content-Length: 0\r\n", 19);
 
 		//read http request & headers
 		int BUFBLOCK = 512;
@@ -159,7 +153,6 @@ void* http_worker(void* q) {
 			}
 		}
 		close(got);
-		#endif
 	}
 	#ifdef DEBUG_MANAGEMENT
 	printf("killing self\n");
@@ -185,8 +178,6 @@ int main() {
 
 	int reuse = 1;
 	setsockopt(wsock, SOL_SOCKET, SO_REUSEADDR, (char *) &reuse, sizeof(reuse));
-
-	fcntl(wsock, F_SETFL, fcntl(wsock, F_GETFL) | FASYNC | O_ASYNC);
 
 	if (bind(wsock, (struct sockaddr*) &waddr, sizeof(waddr)) < 0)
 		die("bind() failed");
