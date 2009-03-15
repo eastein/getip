@@ -76,6 +76,13 @@ void acceptloop(tsq<struct connection_descriptor>* fdqueue, int sockfd) {
 	}
 }
 
+void sendresponse(int fd, char* ipstring) {
+	int ipsize = strlen(ipstring);
+	char* response = (char*) malloc(1024 * sizeof(char));
+	sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Transer-Encoding: 7bit\r\nContent-Length: %d\r\n\r\n%s\r\n", ipsize + 2, ipstring);
+	pushbuffer(fd, response, strlen(response));
+}
+
 void* http_worker(void* q) {
 	tsq<struct connection_descriptor>* tq = (tsq<struct connection_descriptor>*) q;
 
@@ -85,8 +92,6 @@ void* http_worker(void* q) {
 	while (got >= 0) {
 		cdesc = tq->pop();
 		got = cdesc.fd;
-
-		printf("worker reads IP as %s\n", cdesc.ipaddr);
 
 		//buffer management
 		int BUFBLOCK = 512;
@@ -156,7 +161,13 @@ void* http_worker(void* q) {
 						//HTTP request is complete
 						done = true;
 					} else {
-						printf("got a line of size %d: %s\n", lsize, buf);
+						//detect proxy header, copy IP from it
+						if (strncasecmp(buf, "X-Forwarded-For: ", 17) == 0) {
+							char* comma = strchr(buf, ',');
+							if (comma != NULL)
+								comma[0] = 0;
+
+						}
 					}
 					
 					//purge line from buffer, update buffer status variables
@@ -172,6 +183,7 @@ void* http_worker(void* q) {
 				}
 			}
 		}
+		sendresponse(cdesc.fd, cdesc.ipaddr);
 		free(buf);
 		free(cdesc.ipaddr);
 		close(got);
@@ -188,7 +200,6 @@ void die(const char* s) {
 }
 
 int main() {
-	//create read and write bound sockets
 	unsigned short wport = 8080;
 
 	if ((wsock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -207,6 +218,7 @@ int main() {
 	if (listen(wsock, CWAIT) < 0)
 		die("listen() failed");
 
+	// create a connection queue for passing the connections to the workers
 	tsq<struct connection_descriptor>* rtsq = new tsq<struct connection_descriptor>();
 
 	// create threads
