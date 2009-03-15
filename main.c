@@ -89,7 +89,7 @@ void* http_worker(void* q) {
 	struct connection_descriptor cdesc;
 
 	//buffer management
-	int BUFBLOCK = 512;
+	int BUFBLOCK = 2048;
 	int BUFFREE = 512;
 	int BUFSIZE = BUFBLOCK;
 	int BUFUSED = 0;
