@@ -5,6 +5,7 @@
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include <sys/time.h>
 #include <sys/select.h>
