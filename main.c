@@ -21,14 +21,9 @@
 #include "tsq.cpp"
 #include "defs.h"
 
-#define READFD 0
-#define WRITEFD 1
-
 #define CWAIT 100
 #define DIE_USEC 1000
-#define RTHREADS 2
-//DO NOT INCREASE ABOVE 1.  THERE IS NO THREAD SAFETY FOR WRITES.
-#define WTHREADS 1
+#define RTHREADS 200
 
 struct sockaddr_in waddr;
 int wsock;
