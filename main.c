@@ -38,10 +38,11 @@ void assert(bool truth, const char* string) {
 		printf("FATAL ERROR: %s\n", string);
 }
 
-void acceptloop(tsq<int>* fdqueue, int sockfd) {
+void acceptloop(tsq<struct connection_descriptor>* fdqueue, int sockfd) {
 	//struct for storing client address (not stored)
 	struct sockaddr_in caddr;
 	unsigned int clen = sizeof(caddr);
+	struct connection_descriptor cdesc;
 
 	//support structures for select waits
 	fd_set ss;
@@ -57,9 +58,18 @@ void acceptloop(tsq<int>* fdqueue, int sockfd) {
 			//accept the connection
 			int cfd = accept(sockfd, (struct sockaddr*) &caddr, &clen);
 
+			//store the descriptor and IP address
+			char* ipbuf = (char*) malloc(256);
+			if (inet_ntop(AF_INET, &caddr.sin_addr, ipbuf, 256) == NULL) {
+				bcopy("Unable to determine client address.", ipbuf, 36 * sizeof(char));
+			}
+
+			cdesc.fd = cfd;
+			cdesc.ipaddr = ipbuf;
+
 			//store the file descriptor on the queue if it's valid
 			if (cfd >= 0) {
-				fdqueue->push(cfd);
+				fdqueue->push(cdesc);
 			} else {
 				#ifdef DEBUG_NETWORK
 				printf("%d: accept error: %d\n", pid_me, cfd);
@@ -70,12 +80,17 @@ void acceptloop(tsq<int>* fdqueue, int sockfd) {
 }
 
 void* http_worker(void* q) {
-	tsq<int>* tq = (tsq<int>*) q;
+	tsq<struct connection_descriptor>* tq = (tsq<struct connection_descriptor>*) q;
 
+	struct connection_descriptor cdesc;
 	int tid = 1;
 	int got = 0;
 	while (got >= 0) {
-		got = tq->pop();
+		cdesc = tq->pop();
+		got = cdesc.fd;
+
+		printf("worker reads IP as %s\n", cdesc.ipaddr);
+		free(cdesc.ipaddr);
 
 		//read http request & headers
 		int BUFBLOCK = 512;
@@ -185,7 +200,7 @@ int main() {
 	if (listen(wsock, CWAIT) < 0)
 		die("listen() failed");
 
-	tsq<int>* rtsq = new tsq<int>();
+	tsq<struct connection_descriptor>* rtsq = new tsq<struct connection_descriptor>();
 
 	// create threads
 	pthread_t rloops[RTHREADS];

@@ -12,4 +12,9 @@
 
 // #define DEBUG_BUFFERS 1
 
+struct connection_descriptor {
+	char*	ipaddr;
+	int	fd;
+};
+
 #endif
