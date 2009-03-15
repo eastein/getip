@@ -23,7 +23,7 @@
 
 #define CWAIT 100
 #define DIE_USEC 1000
-#define RTHREADS 200
+#define RTHREADS 100
 
 struct sockaddr_in waddr;
 int wsock;
@@ -94,8 +94,8 @@ void* http_worker(void* q) {
 		got = cdesc.fd;
 
 		//buffer management
-		int BUFBLOCK = 512;
-		int BUFFREE = 512;
+		int BUFBLOCK = 256;
+		int BUFFREE = 256;
 		int BUFSIZE = BUFBLOCK;
 		int BUFUSED = 0;
 
