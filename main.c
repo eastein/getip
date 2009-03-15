@@ -29,8 +29,10 @@ struct sockaddr_in waddr;
 int wsock;
 
 void assert(bool truth, const char* string) {
-	if (!truth)
+	if (!truth) {
 		printf("FATAL ERROR: %s\n", string);
+		exit(1);
+	}
 }
 
 void acceptloop(tsq<struct connection_descriptor>* fdqueue, int sockfd) {
@@ -85,38 +87,42 @@ void* http_worker(void* q) {
 		got = cdesc.fd;
 
 		printf("worker reads IP as %s\n", cdesc.ipaddr);
-		free(cdesc.ipaddr);
 
-		//read http request & headers
+		//buffer management
 		int BUFBLOCK = 512;
 		int BUFFREE = 512;
 		int BUFSIZE = BUFBLOCK;
 		int BUFUSED = 0;
+
+		//allocate the buffer
+		char* nbuf = NULL;
 		char* buf = (char*) malloc (BUFSIZE * sizeof(char));
 		assert(buf != NULL, "could not allocate buffer");
-		char* nbuf = NULL;
 
 		bool done = false;
-		int crlfbegin = 0;	//the offset in the buffer of the beginning of the CRLF tuple
-		int crlfmode = 0;	//number of recognized parts of a CRLF read
+		//number of recognized parts of a CRLF read
+		int crlfmode = 0;
 		while (!done) {
 			// check if the buffer is big enough.
 			if (BUFSIZE - BUFUSED < BUFFREE) {
+				// it's not. make it bigger by BUFBLOCK bytes.
 				int nbsize = BUFSIZE + BUFBLOCK;
 				
-				// it's not. make it bigger.
+				// allocate new buffer size
 				nbuf = (char*) realloc(buf, sizeof(char) * nbsize);
 				assert(nbuf != NULL, "could not enlarge buffer");
 				buf = nbuf;
 			}
 
-			// read a bunch of data.
 			#ifdef DEBUG_BUFFERS
 			printf("reading up to %d bytes\n", BUFSIZE - BUFUSED);
 			#endif
+
+			// read up to the size of the buffer from the network
 			int r = read(got, &buf[BUFUSED], BUFSIZE - BUFUSED);
 			assert(r >= 0, "read error from pipe");
 			BUFUSED += r;
+
 			#ifdef DEBUG_BUFFERS
 			printf("got %d bytes, buffer is now%d\n", r, BUFUSED);
 			#endif
@@ -127,7 +133,6 @@ void* http_worker(void* q) {
 				//state machine for recognizing CRLF tuples
 				if (crlfmode == 0) {
 					if (buf[i] == CR) {
-						crlfbegin = i;
 						crlfmode++;
 					}
 				} else if (crlfmode == 1) {
@@ -139,18 +144,22 @@ void* http_worker(void* q) {
 				}
 
 				if (crlfmode == 2) {
+					//reset the CRLF recognizing state machine
 					crlfmode = 0;
 					//determine size of the line
+
 					int lsize = i - 1;
 					buf[lsize] = 0;
-					printf("got a line of size %d: %s\n", lsize, buf);
 
-					//process line here (TODO)
+					//process line here
 					if (lsize == 0) {
+						//HTTP request is complete
 						done = true;
+					} else {
+						printf("got a line of size %d: %s\n", lsize, buf);
 					}
 					
-					//purge line from buffer, update used variables
+					//purge line from buffer, update buffer status variables
 					BUFUSED -= (lsize + 2);
 					if (BUFUSED > 0) {
 						#ifdef DEBUG_BUFFERS
@@ -158,10 +167,13 @@ void* http_worker(void* q) {
 						#endif
 						bcopy(&buf[i+1], buf, BUFUSED);
 					}
+					//continue the loop at an earlier part of the buffer
 					i = -1;
 				}
 			}
 		}
+		free(buf);
+		free(cdesc.ipaddr);
 		close(got);
 	}
 	#ifdef DEBUG_MANAGEMENT
