@@ -86,24 +86,23 @@ void sendresponse(int fd, char* ipstring) {
 
 void* http_worker(void* q) {
 	tsq<struct connection_descriptor>* tq = (tsq<struct connection_descriptor>*) q;
-
 	struct connection_descriptor cdesc;
+
+	//buffer management
+	int BUFBLOCK = 512;
+	int BUFFREE = 512;
+	int BUFSIZE = BUFBLOCK;
+	int BUFUSED = 0;
+
+	//allocate the buffer
+	char* nbuf = NULL;
+	char* buf = (char*) malloc (BUFSIZE * sizeof(char));
+	assert(buf != NULL, "could not allocate buffer");
+
 	int tid = 1;
-	int got = 0;
-	while (got >= 0) {
+	cdesc.fd = 0;
+	while (cdesc.fd >= 0) {
 		cdesc = tq->pop();
-		got = cdesc.fd;
-
-		//buffer management
-		int BUFBLOCK = 1024;
-		int BUFFREE = 512;
-		int BUFSIZE = BUFBLOCK;
-		int BUFUSED = 0;
-
-		//allocate the buffer
-		char* nbuf = NULL;
-		char* buf = (char*) malloc (BUFSIZE * sizeof(char));
-		assert(buf != NULL, "could not allocate buffer");
 
 		bool done = false;
 		//number of recognized parts of a CRLF read
@@ -125,7 +124,7 @@ void* http_worker(void* q) {
 			#endif
 
 			// read up to the size of the buffer from the network
-			int r = read(got, &buf[BUFUSED], BUFSIZE - BUFUSED);
+			int r = read(cdesc.fd, &buf[BUFUSED], BUFSIZE - BUFUSED);
 			assert(r >= 0, "read error from pipe");
 			BUFUSED += r;
 
@@ -185,10 +184,12 @@ void* http_worker(void* q) {
 			}
 		}
 		sendresponse(cdesc.fd, cdesc.ipaddr);
-		free(buf);
+		close(cdesc.fd);
 		free(cdesc.ipaddr);
-		close(got);
 	}
+
+	free(buf);
+
 	#ifdef DEBUG_MANAGEMENT
 	printf("killing self\n");
 	#endif
