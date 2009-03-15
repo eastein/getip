@@ -38,7 +38,7 @@ void assert(bool truth, const char* string) {
 		printf("FATAL ERROR: %s\n", string);
 }
 
-void acceptloop(tsq<int>* fdqueue, sem_t* status_sem, int* acceptflag, int sockfd, int threads) {
+void acceptloop(tsq<int>* fdqueue, int sockfd) {
 	//struct for storing client address (not stored)
 	struct sockaddr_in caddr;
 	unsigned int clen = sizeof(caddr);
@@ -187,16 +187,15 @@ int main() {
 
 	tsq<int>* rtsq = new tsq<int>();
 
-	//threads
+	// create threads
 	pthread_t rloops[RTHREADS];
-	
 	for (int i = 0; i < RTHREADS; i++) {
 		if (pthread_create(&rloops[i], NULL, http_worker, (void*) rtsq)) {
 			die("failed to create thread");
 		}
 	}
 
-	acceptloop(rtsq, NULL, NULL, wsock, RTHREADS);
+	acceptloop(rtsq, wsock);
 
 	for (int i = 0; i < RTHREADS; i++) {
 		pthread_join(rloops[i], NULL);
