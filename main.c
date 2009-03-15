@@ -195,11 +195,12 @@ int main() {
 		}
 	}
 
+	//single threaded acceptor, pipes to queue of connection descriptors
 	acceptloop(rtsq, wsock);
 
+	//join threads and delete queue, as if this is ever going to happen
 	for (int i = 0; i < RTHREADS; i++) {
 		pthread_join(rloops[i], NULL);
 	}
-
 	delete rtsq;
 }
