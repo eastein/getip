@@ -10,4 +10,6 @@
 #define DEBUG_MANAGEMENT 1
 //#define DEBUG_NETWORK 1
 
+// #define DEBUG_BUFFERS 1
+
 #endif

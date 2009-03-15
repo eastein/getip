@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
@@ -76,20 +77,24 @@ void* http_worker(void* q) {
 	int got = 0;
 	while (got >= 0) {
 		got = tq->pop();
+		fcntl(got, F_SETFL, O_ASYNC, 1);
 		#ifdef DEBUG_LOW
 		printf("thread got fd %d\n", got);
 
+		pushbuffer(got, "Content-Length: 0\r\n", 19);
+
 		//read http request & headers
-		int BUFBLOCK = 256;
-		int BUFFREE = 128;
+		int BUFBLOCK = 512;
+		int BUFFREE = 512;
 		int BUFSIZE = BUFBLOCK;
 		int BUFUSED = 0;
 		char* buf = (char*) malloc (BUFSIZE * sizeof(char));
 		assert(buf != NULL, "could not allocate buffer");
 		char* nbuf = NULL;
 
-		bool done;
-		int crlfbegin = 0;
+		bool done = false;
+		int crlfbegin = 0;	//the offset in the buffer of the beginning of the CRLF tuple
+		int crlfmode = 0;	//number of recognized parts of a CRLF read
 		while (!done) {
 			// check if the buffer is big enough.
 			if (BUFSIZE - BUFUSED < BUFFREE) {
@@ -102,26 +107,56 @@ void* http_worker(void* q) {
 			}
 
 			// read a bunch of data.
+			#ifdef DEBUG_BUFFERS
+			printf("reading up to %d bytes\n", BUFSIZE - BUFUSED);
+			#endif
 			int r = read(got, &buf[BUFUSED], BUFSIZE - BUFUSED);
 			assert(r >= 0, "read error from pipe");
+			BUFUSED += r;
+			#ifdef DEBUG_BUFFERS
+			printf("got %d bytes, buffer is now%d\n", r, BUFUSED);
+			#endif
 
 			#define CR 13
 			#define LF 10
-			for (int i = BUFUSED; i < r + BUFUSED; i++) {
+			for (int i = 0; i < BUFUSED; i++) {
+				//state machine for recognizing CRLF tuples
 				if (crlfmode == 0) {
-					if (buf[i] = CR) {
+					if (buf[i] == CR) {
 						crlfbegin = i;
 						crlfmode++;
 					}
 				} else if (crlfmode == 1) {
-					if (buf[i] = LF
-			}
+					if (buf[i] == LF) {
+						crlfmode++;
+					} else {
+						crlfmode = 0;
+					}
+				}
 
-			if (BUFUSED > 0) {
-				buf[BUFUSED] = 0;
-				printf("got some data: %s\n", buf);
+				if (crlfmode == 2) {
+					crlfmode = 0;
+					//determine size of the line
+					int lsize = i - 1;
+					buf[lsize] = 0;
+					printf("got a line of size %d: %s\n", lsize, buf);
+
+					//process line here (TODO)
+					if (lsize == 0) {
+						done = true;
+					}
+					
+					//purge line from buffer, update used variables
+					BUFUSED -= (lsize + 2);
+					if (BUFUSED > 0) {
+						#ifdef DEBUG_BUFFERS
+						printf("buffer now is of size %d\n", BUFUSED);
+						#endif
+						bcopy(&buf[i+1], buf, BUFUSED);
+					}
+					i = -1;
+				}
 			}
-			BUFUSED += r;
 		}
 		close(got);
 		#endif
@@ -139,7 +174,7 @@ void die(const char* s) {
 
 int main() {
 	//create read and write bound sockets
-	unsigned short wport = 80;
+	unsigned short wport = 8080;
 
 	if ((wsock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		die("socket() failed");
@@ -150,6 +185,8 @@ int main() {
 
 	int reuse = 1;
 	setsockopt(wsock, SOL_SOCKET, SO_REUSEADDR, (char *) &reuse, sizeof(reuse));
+
+	fcntl(wsock, F_SETFL, fcntl(wsock, F_GETFL) | FASYNC | O_ASYNC);
 
 	if (bind(wsock, (struct sockaddr*) &waddr, sizeof(waddr)) < 0)
 		die("bind() failed");
