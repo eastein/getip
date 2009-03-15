@@ -78,9 +78,10 @@ void acceptloop(tsq<struct connection_descriptor>* fdqueue, int sockfd) {
 
 void sendresponse(int fd, char* ipstring) {
 	int ipsize = strlen(ipstring);
-	char* response = (char*) malloc(1024 * sizeof(char));
+	char* response = (char*) malloc(370 * sizeof(char));
 	sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Transer-Encoding: 7bit\r\nContent-Length: %d\r\n\r\n%s\r\n", ipsize + 2, ipstring);
 	pushbuffer(fd, response, strlen(response));
+	free(response);
 }
 
 void* http_worker(void* q) {
