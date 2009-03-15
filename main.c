@@ -94,8 +94,8 @@ void* http_worker(void* q) {
 		got = cdesc.fd;
 
 		//buffer management
-		int BUFBLOCK = 256;
-		int BUFFREE = 256;
+		int BUFBLOCK = 1024;
+		int BUFFREE = 512;
 		int BUFSIZE = BUFBLOCK;
 		int BUFUSED = 0;
 
