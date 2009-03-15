@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <json/json.h>
 
 void pushbuffer(int fd, char* buf, size_t count) {
 	size_t sent = 0;
