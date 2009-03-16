@@ -5,11 +5,9 @@ CC= g++
 DOTO = ${CC} -c ${FLAGS} 
 LINK = ${CC} ${FLAGS} ${LIBS}
 
-# executables
 getip: main.o rw.o
 	${LINK} main.o rw.o -o getip
 
-# clean
 clean:
 	rm -f getip *.o *~
 

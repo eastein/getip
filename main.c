@@ -26,6 +26,13 @@
 #define DIE_USEC 1000
 #define RTHREADS 100
 
+/*
+copyright 2009 Eric Stein <eastein@wpi.edu>
+Licensed under the GNU Public License version 2 or any subsequent version
+published by the Free Software Foundation, at your option.  If you want to use
+this code in a non-GPL application, contact me for permission.
+*/
+
 struct sockaddr_in waddr;
 int wsock;
 
